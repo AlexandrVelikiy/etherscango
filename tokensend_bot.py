@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-from models import Wallets,Incoming, connect_to_db
+from models import Wallets,Incoming, User_wallets, connect_to_db
 import logging
 import time, os
 from Crypto.Cipher import AES
@@ -13,12 +13,12 @@ from web3 import Web3, HTTPProvider, IPCProvider
 from config import DEBUG,CONTRACT_ADD, SQLALCHEMY_DATABASE_URI,LOG_PATH, ETH_NODE, \
                     OUT_WALLET, OUT_PRIVKEY, ETH_FEE, COLD_WALLET,ABI_FILE_PATH, MASTERPASS
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
 
 fh = logging.FileHandler(LOG_PATH)
-
 fh.setLevel(logging.DEBUG)
+
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 if DEBUG:
@@ -31,13 +31,6 @@ else:
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-basedir = os.path.abspath(os.path.dirname(__file__))
-
-SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-                              'sqlite:///' + os.path.join(basedir, 'bd.db')
 
 cold_wallet=Web3.toChecksumAddress(COLD_WALLET)
 out_wallet=Web3.toChecksumAddress(OUT_WALLET)
@@ -98,7 +91,7 @@ def send_wtp_tokens():
     global out_nonce
 
     out_nonce=w3.eth.getTransactionCount(out_wallet)
-    logger.info (out_nonce)
+    logger.info(f'out_wallet nouce {out_nonce}')
 
     hashes=[]
     pending=[]
@@ -107,15 +100,22 @@ def send_wtp_tokens():
 
     contract_abi=json.loads(open(ABI_FILE_PATH,"r").read())
     contract=w3.eth.contract(address=contract_address, abi=contract_abi)
-    logger.info(f'Contract: {contract}')
+
 
     session = connect_to_db(SQLALCHEMY_DATABASE_URI)
-    wallets = session.query(Incoming).filter(Incoming.status==0).all()
-    logger.info(f'In table Incoming found {len(wallets)} transactions')
 
-    for w in wallets:
+    #wallets = session.query(User_wallets).filter(Incoming.status==0).all()
+    wallets = session.query(User_wallets).all()
+    logger.info(f'In table User_wallets found {len(wallets)} wallets')
+
+    for i, w in enumerate(wallets) :
         # если баланс WTP токенов 0 то пропускаем этот кошелек
-        token_balance = contract.functions.balanceOf(Web3.toChecksumAddress(w.wallet)).call()
+        logger.info(f'~Check {i+1} wallet {w.wallet}')
+        try:
+            token_balance = contract.functions.balanceOf(Web3.toChecksumAddress(w.wallet)).call()
+        except:
+            logger.info(f'wallet {w.wallet} not correct, skipping')
+            continue
         if token_balance < 0.01:
             logger.info(f'Wallet: {w.wallet} no balance WTP token')
             continue
@@ -213,7 +213,7 @@ def send_wtp_tokens():
             txhash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
             logger.info(f"txhash: {txhash.hex()}")
 
-        logger.info('all transaction completed')
+    logger.info('all transaction completed')
 
 
 

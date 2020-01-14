@@ -33,7 +33,7 @@ class Incoming(Base):
 class Wallets(Base):
     __tablename__ = 'wallets'
     id = Column('id', Integer, primary_key=True)
-    wallet = Column('wallet', String)
+    wallet = Column('wallet', String(100))
     privkey = Column('privkey', String)
     passwd = Column('passwd', String)
     currency = Column('currency', String(4))
