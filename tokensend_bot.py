@@ -68,17 +68,7 @@ def decrypt(enc, password):
     data=cipher.decrypt(enc)
     return _unpad(data.decode())
 
-"""
-def encrypt(text, password):
-    salt=gen_pwd()
-    iv=gen_pwd()
-    key = salt+password
-    cipher = AES.new(key.encode(), AES.MODE_CBC, iv.encode())
-    raw = _pad(str_to_bytes(text))
-    data=b64encode(cipher.encrypt(raw)).decode()
-    myString = "-".join([salt, iv, data])
-    return b64encode(myString.encode())
-"""
+
 
 def send_eth(wallet):
     # пополняем кошелек ефиром
@@ -109,7 +99,7 @@ def send_wtp_tokens():
 
     out_nonce=w3.eth.getTransactionCount(out_wallet)
     logger.info (out_nonce)
-    wallets=[]
+
     hashes=[]
     pending=[]
 
