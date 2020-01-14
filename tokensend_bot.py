@@ -6,12 +6,12 @@ import time, os
 from Crypto.Cipher import AES
 from base64 import b64decode, b64encode
 import json
-
+from requests.exceptions import HTTPError
 from web3.auto import w3
 from web3 import Web3, HTTPProvider, IPCProvider
 
 from config import DEBUG,CONTRACT_ADD, TIME_OUT, SQLALCHEMY_DATABASE_URI,LOG_PATH, ETH_NODE, \
-                    OUT_WALLET, OUT_PRIVKEY, ETH_FEE, COLD_WALLET,ABI_FILE_PATH, MASTERPASS
+                    OUT_WALLET, OUT_PRIVKEY, ETH_FEE, COLD_WALLET,ABI_FILE_PATH, MASTERPASS,TIME_OUT_AFTER_HTTPERROR_429
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
@@ -115,13 +115,19 @@ def send_wtp_tokens():
         logger.info(f'~Check {i+1} wallet {w.wallet}')
         try:
             token_balance = contract.functions.balanceOf(Web3.toChecksumAddress(w.wallet)).call()
+        except HTTPError:
+            logger.info(f'HTTPERROR_429, pause {TIME_OUT_AFTER_HTTPERROR_429} c...')
+            time.sleep(TIME_OUT_AFTER_HTTPERROR_429)
+            continue
         except:
-            logger.exception('balanceOf')
             logger.info(f'wallet {w.wallet} not correct, skipping')
             continue
+
+
         if token_balance < 0.01:
             logger.info(f'Wallet: {w.wallet} no balance WTP token')
             continue
+
 
         logger.info(f'Wallet: {w.wallet} balance WTP token {token_balance}')
 

@@ -19,7 +19,7 @@ DEBUG = True
 TOKEN = '5UZG48NFB3PF1SCU83V2I9UXEHKHSRQYFT'
 
 TIME_OUT = 0.25 # ограничим не более 4-х запросов в секунду
-TIME_OUT_BETWEEN_REPEAT = 5 # науза между повторами
+TIME_OUT_AFTER_HTTPERROR_429 = 45 # пауза после ошибки
 
 SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://alex:passw0rd159@localhost/wtp_mining'
 #путь к лог файлу
