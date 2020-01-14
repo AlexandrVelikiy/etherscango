@@ -10,7 +10,7 @@ import json
 from web3.auto import w3
 from web3 import Web3, HTTPProvider, IPCProvider
 
-from config import DEBUG,CONTRACT_ADD, SQLALCHEMY_DATABASE_URI,LOG_PATH, ETH_NODE, \
+from config import DEBUG,CONTRACT_ADD, TIME_OUT, SQLALCHEMY_DATABASE_URI,LOG_PATH, ETH_NODE, \
                     OUT_WALLET, OUT_PRIVKEY, ETH_FEE, COLD_WALLET,ABI_FILE_PATH, MASTERPASS
 
 logger = logging.getLogger(__file__)
@@ -105,15 +105,18 @@ def send_wtp_tokens():
     session = connect_to_db(SQLALCHEMY_DATABASE_URI)
 
     #wallets = session.query(User_wallets).filter(Incoming.status==0).all()
+
     wallets = session.query(User_wallets).all()
     logger.info(f'In table User_wallets found {len(wallets)} wallets')
 
     for i, w in enumerate(wallets) :
+        time.sleep(TIME_OUT)
         # если баланс WTP токенов 0 то пропускаем этот кошелек
         logger.info(f'~Check {i+1} wallet {w.wallet}')
         try:
             token_balance = contract.functions.balanceOf(Web3.toChecksumAddress(w.wallet)).call()
         except:
+            logger.exception('balanceOf')
             logger.info(f'wallet {w.wallet} not correct, skipping')
             continue
         if token_balance < 0.01:
@@ -188,6 +191,7 @@ def send_wtp_tokens():
         logger.info("Sending tokens from left wallets..")
 
         for w in pending:
+            time.sleep(TIME_OUT)
             token_balance = contract.functions.balanceOf(Web3.toChecksumAddress(w.wallet)).call()
             nonce = w3.eth.getTransactionCount(Web3.toChecksumAddress(w.wallet))
             logger.info(f'Send {token_balance} tokens to cold wallet .....')

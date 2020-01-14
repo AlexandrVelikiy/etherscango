@@ -7,6 +7,7 @@ import  logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 Base = declarative_base()
 
 class User_wallets(Base):
