@@ -3,10 +3,10 @@ from sqlalchemy import create_engine
 from sqlalchemy import Table, Column, Integer, String, MetaData, Boolean, Float, DateTime, CHAR
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import  logging
+import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+#logging.basicConfig(level=logging.INFO)
+#logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -39,6 +39,18 @@ class Wallets(Base):
     passwd = Column('passwd', String)
     currency = Column('currency', String(4))
     status = Column('status', Integer)
+
+class Withdrawals(Base):
+     __tablename__='withdrawals'
+     id = Column('id', Integer, primary_key=True)
+     user_id = Column('user_id', Integer)
+     amount = Column('amount', Float)
+     wallet = Column('wallet', String(191))
+     status = Column('status', Integer)
+     created_at = Column('created_at', DateTime)
+     updated_at = Column('updated_at', DateTime)
+     txhash = Column('txhash', String(191))
+     pending = Column('pending', Integer)
 
 def connect_to_db(db_url):
     try:

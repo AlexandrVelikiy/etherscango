@@ -162,12 +162,12 @@ def send_wtp_tokens():
             txn = contract.functions.transfer(
                 Web3.toChecksumAddress(cold_wallet),
                 int(token_balance),
-                ).buildTransaction({
-                    'chainId': 1,
-                    'gas': 100000,
-                    'gasPrice': w3.toWei(ETH_FEE, 'gwei'),
-                    'nonce': nonce,
-                })
+            ).buildTransaction({
+                'chainId': 1,
+                'gas': 100000,
+                'gasPrice': w3.toWei(ETH_FEE, 'gwei'),
+                'nonce': nonce,
+            })
             signed_txn = w3.eth.account.signTransaction(txn, private_key=privkey)
             txhash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
 
