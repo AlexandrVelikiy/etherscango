@@ -34,6 +34,10 @@ logger.addHandler(fh)
 out_wallet=Web3.toChecksumAddress(OUT_WALLET)
 out_nonce=0
 w3 = Web3(HTTPProvider(ETH_NODE))
+hashes = []
+pending = []
+
+
 
 def str_to_bytes(data):
     u_type = type(b''.decode('utf8'))
@@ -58,41 +62,62 @@ def decrypt(enc, password):
 
 
 def chek_receipt_transaction():
+    global all_trans_compleate
     try:
-        global hashes
-        if len(hashes) > 0:
-            logger.info(f'Waiting for  transactions receitps for {len(hashes)} transactions ....')
-            p = True
+        session = connect_to_db(SQLALCHEMY_DATABASE_URI)
+        pendingtrans = session.query(Withdrawals).filter(Withdrawals.pending == 1).all()
+        logger.info(f'Found {len(pendingtrans)} transactions')
 
+        for pend_tr in pendingtrans:
             try:
-                while p:
-                    for h in hashes:
-                        if not w3.eth.getTransactionReceipt(h):
+                r = w3.eth.getTransactionReceipt(pend_tr.txhash)
+                if not r:
+                    # pending ...
+                    continue
+                else:
+                    status = r['status']
+                    if status == 1:
+                        # транзакция прошла
+                        pend_tr.pending = 0
+                        pend_tr.status = 1
+                        pend_tr.txhash = ''
+                        session.commit()
+                    else:
+                        # транзакция неуспешна
+                        pend_tr.pending = 0
+                        pend_tr.status = 0
+                        pend_tr.txhash = 'fail'
+                        session.commit()
 
-                            # тут удаляем эту транзакцию из списка ожидания
-                            hashes.pop(h)
+            except Exception as e:
+                # транзакция ненайдена
+                print(e)
 
-                            p = True
-                            break
-                        else:
-                            p = False
-                    time.sleep(10)
-            except:
-                logger.exception('Waiting for eth transactions')
+        # проверяме если в базе есть тразакции которые ожидают завершения
+        pendingtrans = session.query(Withdrawals).filter(Withdrawals.pending == 1).all()
+        if len(pendingtrans) > 0:
+            logger.info(f'Found {len(pendingtrans)} pendingt transaction')
+            return False
+        else:
+            # проверяем есть ли транзакции которые не прошли - txhash = fail
+            failtrans = session.query(Withdrawals).filter(Withdrawals.txhash == 'fail').all()
+            if len(failtrans) > 0:
+                logger.info(f'{len(failtrans)} transaction fail, repeat them')
+            else:
+                logger.info(f'All transaction complete')
+                all_trans_compleate = True
+            return True
 
     except:
         logger.exception('chek_receipt_transaction')
+    finally:
+        session.close()
 
 def send_wtp_tokens():
     global out_nonce
 
-    r = w3.eth.getTransactionReceipt('0x538732ad1a4ca17069730ef068b281555da0d983e790bc3cbb029f31851af3d0')
-
     out_nonce = w3.eth.getTransactionCount(out_wallet)
     logger.info(f'out_wallet nouce {out_nonce}')
-
-    hashes=[]
-    pending=[]
 
     contract_address=Web3.toChecksumAddress(CONTRACT_ADD)
 
@@ -103,6 +128,12 @@ def send_wtp_tokens():
         return False
 
     contract = w3.eth.contract(address=contract_address, abi=contract_abi)
+    decimal = contract.functions.decimals().call()
+    out_wallet_balance = contract.functions.balanceOf(Web3.toChecksumAddress(out_wallet)).call()
+    eth_balance = w3.eth.getBalance(Web3.toChecksumAddress(out_wallet))
+
+    logger.info(f'Out wallet balance {out_wallet_balance}')
+    logger.info(f"Eth balance: {eth_balance}")
 
     session = connect_to_db(SQLALCHEMY_DATABASE_URI)
 
@@ -116,11 +147,11 @@ def send_wtp_tokens():
             logger.info(f'Send {w.amount} WTP tokens to {w.wallet} ...')
             nonce = w3.eth.getTransactionCount(Web3.toChecksumAddress(out_wallet))
 
-            txn = contract.functions.transferFrom(
-                Web3.toChecksumAddress(out_wallet),
+
+            txn = contract.functions.transfer(
                 Web3.toChecksumAddress(w.wallet),
-                #int(w.amount),
-                int(1),
+                int(w.amount*10**decimal),
+                #int(1),
             ).buildTransaction({
                 'chainId': 1,
                 'gas': 100000,
@@ -131,24 +162,34 @@ def send_wtp_tokens():
 
             try:
                 txhash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
-            except:
-                logger.exception('sendRawTransaction')
-
-            # ставим  pending и сохраням txhash
-            w.pending = 1
-            w.txhash = txhash
-            session.commit()
-            hashes.append(txhash)
-
-        # проверяем отправились ли транзакции
-        res = chek_receipt_transaction()
-
-
+                # ставим  pending и сохраням txhash
+                w.pending = 1
+                w.txhash = txhash.hex()
+                session.commit()
+            except Exception as e:
+                message = f'Error {e}'
+                logger.error(message)
 
     except:
         logger.exception('send wtp')
+    finally:
+        session.close()
 
+
+def main():
+    all_trans_compleate = False
+
+    while all_trans_compleate:
+        # отправляем токены
+        send_wtp_tokens()
+        # проверяем отправились ли транзакции
+        # если  нужно ждем
+        # если все отправленые то  all_trans_compleate = False
+        # если есто неуспешные то повторяем их
+        while chek_receipt_transaction():
+            # ждем 10
+            time.sleep(10)
 
 
 if __name__ == '__main__':
-    send_wtp_tokens()
+    main()
