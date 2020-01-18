@@ -9,14 +9,16 @@ import json
 from web3.auto import w3
 from web3 import Web3, HTTPProvider
 
+
+
 from config import DEBUG,CONTRACT_ADD, TIME_OUT, SQLALCHEMY_DATABASE_URI,LOG_PATH, ETH_NODE, \
-                    OUT_WALLET, OUT_PRIVKEY, ETH_FEE, COLD_WALLET,ABI_FILE_PATH, MASTERPASS,TIME_OUT_AFTER_HTTPERROR_429
+                    OUT_WALLET, OUT_PRIVKEY, ETH_FEE, COLD_WALLET,ABI_FILE_PATH, MASTERPASS,TIME_OUT_AFTER_HTTPERROR_429,LOG_PATH1
 
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
 
-fh = logging.FileHandler(LOG_PATH)
+fh = logging.FileHandler(LOG_PATH1)
 fh.setLevel(logging.DEBUG)
 
 ch = logging.StreamHandler()
@@ -36,6 +38,7 @@ out_nonce=0
 w3 = Web3(HTTPProvider(ETH_NODE))
 hashes = []
 pending = []
+all_trans_compleate = False
 
 
 
@@ -139,19 +142,15 @@ def send_wtp_tokens():
 
     withdrawals = session.query(Withdrawals).filter(Withdrawals.status == 0).all()
     logger.info(f'In table Withdrawals found {len(withdrawals)} wallets')
-
+    nonce = w3.eth.getTransactionCount(Web3.toChecksumAddress(out_wallet))
     try:
         for i, w in enumerate(withdrawals):
             time.sleep(TIME_OUT)
 
             logger.info(f'Send {w.amount} WTP tokens to {w.wallet} ...')
-            nonce = w3.eth.getTransactionCount(Web3.toChecksumAddress(out_wallet))
-
-
             txn = contract.functions.transfer(
                 Web3.toChecksumAddress(w.wallet),
                 int(w.amount*10**decimal),
-                #int(1),
             ).buildTransaction({
                 'chainId': 1,
                 'gas': 100000,
@@ -166,6 +165,7 @@ def send_wtp_tokens():
                 w.pending = 1
                 w.txhash = txhash.hex()
                 session.commit()
+                nonce = nonce +1
             except Exception as e:
                 message = f'Error {e}'
                 logger.error(message)
@@ -177,16 +177,19 @@ def send_wtp_tokens():
 
 
 def main():
+    global all_trans_compleate
     all_trans_compleate = False
 
-    while all_trans_compleate:
+    while not all_trans_compleate:
         # отправляем токены
         send_wtp_tokens()
+        # ждем
+        time.sleep(10)
         # проверяем отправились ли транзакции
         # если  нужно ждем
         # если все отправленые то  all_trans_compleate = False
         # если есто неуспешные то повторяем их
-        while chek_receipt_transaction():
+        while not chek_receipt_transaction():
             # ждем 10
             time.sleep(10)
 
